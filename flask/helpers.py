@@ -383,7 +383,7 @@ def flash(message, category='message'):
     #     session.setdefault('_flashes', []).append((category, message))
     #
     # This assumed that changes made to mutable structures in the session are
-    # are always in sync with the session object, which is not true for session
+    # always in sync with the session object, which is not true for session
     # implementations that use external storage for keeping their keys/values.
     flashes = session.get('_flashes', [])
     flashes.append((category, message))
@@ -610,7 +610,8 @@ def send_file(filename_or_fp, mimetype=None, as_attachment=False,
                 rv = rv.make_conditional(request, accept_ranges=True,
                                          complete_length=fsize)
             except RequestedRangeNotSatisfiable:
-                file.close()
+                if file is not None:
+                    file.close()
                 raise
         else:
             rv = rv.make_conditional(request)

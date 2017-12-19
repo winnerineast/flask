@@ -6,8 +6,8 @@ Installation
 Python Version
 --------------
 
-We recommend using the latest version of Python 3. Flask supports Python 3.3
-and newer, Python 2.6 and newer, and PyPy.
+We recommend using the latest version of Python 3. Flask supports Python 3.4
+and newer, Python 2.7, and PyPy.
 
 Dependencies
 ------------
@@ -43,10 +43,13 @@ use them if you install them.
   installed.
 * `python-dotenv`_ enables support for :ref:`dotenv` when running ``flask``
   commands.
+* `Watchdog`_ provides a faster, more efficient reloader for the development
+  server.
 
 .. _Blinker: https://pythonhosted.org/blinker/
 .. _SimpleJSON: https://simplejson.readthedocs.io/
 .. _python-dotenv: https://github.com/theskumar/python-dotenv#readme
+.. _watchdog: https://pythonhosted.org/watchdog/
 
 Virtual environments
 --------------------
