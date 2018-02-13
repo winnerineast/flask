@@ -5,9 +5,10 @@
 
     This module implements the central WSGI application object.
 
-    :copyright: (c) 2015 by Armin Ronacher.
+    :copyright: © 2010 by the Pallets team.
     :license: BSD, see LICENSE for more details.
 """
+
 import os
 import sys
 import warnings
@@ -27,7 +28,7 @@ from .config import Config, ConfigAttribute
 from .ctx import AppContext, RequestContext, _AppCtxGlobals
 from .globals import _request_ctx_stack, g, request, session
 from .helpers import _PackageBoundObject, \
-    _endpoint_from_view_func, find_package, get_debug_flag, \
+    _endpoint_from_view_func, find_package, get_env, get_debug_flag, \
     get_flashed_messages, locked_cached_property, url_for
 from .logging import create_logger
 from .sessions import SecureCookieSessionInterface
@@ -196,15 +197,6 @@ class Flask(_PackageBoundObject):
     #: .. versionadded:: 0.11
     config_class = Config
 
-    #: The debug flag.  Set this to ``True`` to enable debugging of the
-    #: application.  In debug mode the debugger will kick in when an unhandled
-    #: exception occurs and the integrated server will automatically reload
-    #: the application if changes in the code are detected.
-    #:
-    #: This attribute can also be configured from the config with the ``DEBUG``
-    #: configuration key.  Defaults to ``False``.
-    debug = ConfigAttribute('DEBUG')
-
     #: The testing flag.  Set this to ``True`` to enable the test mode of
     #: Flask extensions (and in the future probably also Flask itself).
     #: For example this might activate test helpers that have an
@@ -278,7 +270,8 @@ class Flask(_PackageBoundObject):
 
     #: Default configuration parameters.
     default_config = ImmutableDict({
-        'DEBUG':                                get_debug_flag(default=False),
+        'ENV':                                  None,
+        'DEBUG':                                None,
         'TESTING':                              False,
         'PROPAGATE_EXCEPTIONS':                 None,
         'PRESERVE_CONTEXT_ON_EXCEPTION':        None,
@@ -292,6 +285,7 @@ class Flask(_PackageBoundObject):
         'SESSION_COOKIE_PATH':                  None,
         'SESSION_COOKIE_HTTPONLY':              True,
         'SESSION_COOKIE_SECURE':                False,
+        'SESSION_COOKIE_SAMESITE':              None,
         'SESSION_REFRESH_EACH_REQUEST':         True,
         'MAX_CONTENT_LENGTH':                   None,
         'SEND_FILE_MAX_AGE_DEFAULT':            timedelta(hours=12),
@@ -647,7 +641,10 @@ class Flask(_PackageBoundObject):
         root_path = self.root_path
         if instance_relative:
             root_path = self.instance_path
-        return self.config_class(root_path, self.default_config)
+        defaults = dict(self.default_config)
+        defaults['ENV'] = get_env()
+        defaults['DEBUG'] = get_debug_flag()
+        return self.config_class(root_path, defaults)
 
     def auto_find_instance_path(self):
         """Tries to locate the instance path if it was not provided to the
@@ -790,25 +787,41 @@ class Flask(_PackageBoundObject):
             rv.update(processor())
         return rv
 
-    def _reconfigure_for_run_debug(self, debug):
-        """The ``run`` commands will set the application's debug flag. Some
-        application configuration may already be calculated based on the
-        previous debug value. This method will recalculate affected values.
+    #: What environment the app is running in. Flask and extensions may
+    #: enable behaviors based on the environment, such as enabling debug
+    #: mode. This maps to the :data:`ENV` config key. This is set by the
+    #: :envvar:`FLASK_ENV` environment variable and may not behave as
+    #: expected if set in code.
+    #:
+    #: **Do not enable development when deploying in production.**
+    #:
+    #: Default: ``'production'``
+    env = ConfigAttribute('ENV')
 
-        Called by the :func:`flask.cli.run` command or :meth:`Flask.run`
-        method if the debug flag is set explicitly in the call.
+    def _get_debug(self):
+        return self.config['DEBUG']
 
-        :param debug: the new value of the debug flag
-
-        .. versionadded:: 1.0
-            Reconfigures ``app.jinja_env.auto_reload``.
-        """
-        self.debug = debug
+    def _set_debug(self, value):
+        self.config['DEBUG'] = value
         self.jinja_env.auto_reload = self.templates_auto_reload
 
-    def run(
-        self, host=None, port=None, debug=None, load_dotenv=True, **options
-    ):
+    #: Whether debug mode is enabled. When using ``flask run`` to start
+    #: the development server, an interactive debugger will be shown for
+    #: unhandled exceptions, and the server will be reloaded when code
+    #: changes. This maps to the :data:`DEBUG` config key. This is
+    #: enabled when :attr:`env` is ``'development'`` and is overridden
+    #: by the ``FLASK_DEBUG`` environment variable. It may not behave as
+    #: expected if set in code.
+    #:
+    #: **Do not enable debug mode when deploying in production.**
+    #:
+    #: Default: ``True`` if :attr:`env` is ``'development'``, or
+    #: ``False`` otherwise.
+    debug = property(_get_debug, _set_debug)
+    del _get_debug, _set_debug
+
+    def run(self, host=None, port=None, debug=None,
+            load_dotenv=True, **options):
         """Runs the application on a local development server.
 
         Do not use ``run()`` in a production setting. It is not intended to
@@ -856,27 +869,40 @@ class Flask(_PackageBoundObject):
             If installed, python-dotenv will be used to load environment
             variables from :file:`.env` and :file:`.flaskenv` files.
 
-        .. versionchanged:: 0.10
-           The default port is now picked from the ``SERVER_NAME`` variable.
+            If set, the :envvar:`FLASK_ENV` and :envvar:`FLASK_DEBUG`
+            environment variables will override :attr:`env` and
+            :attr:`debug`.
 
+            Threaded mode is enabled by default.
+
+        .. versionchanged:: 0.10
+            The default port is now picked from the ``SERVER_NAME``
+            variable.
         """
         # Change this into a no-op if the server is invoked from the
-        # command line.  Have a look at cli.py for more information.
+        # command line. Have a look at cli.py for more information.
         if os.environ.get('FLASK_RUN_FROM_CLI') == 'true':
             from .debughelpers import explain_ignored_app_run
             explain_ignored_app_run()
             return
 
         if load_dotenv:
-            from flask.cli import load_dotenv
-            load_dotenv()
+            cli.load_dotenv()
 
+            # if set, let env vars override previous values
+            if 'FLASK_ENV' in os.environ:
+                self.env = get_env()
+                self.debug = get_debug_flag()
+            elif 'FLASK_DEBUG' in os.environ:
+                self.debug = get_debug_flag()
+
+        # debug passed to method overrides all other sources
         if debug is not None:
-            self._reconfigure_for_run_debug(bool(debug))
+            self.debug = bool(debug)
 
         _host = '127.0.0.1'
         _port = 5000
-        server_name = self.config.get("SERVER_NAME")
+        server_name = self.config.get('SERVER_NAME')
         sn_host, sn_port = None, None
 
         if server_name:
@@ -884,8 +910,12 @@ class Flask(_PackageBoundObject):
 
         host = host or sn_host or _host
         port = int(port or sn_port or _port)
+
         options.setdefault('use_reloader', self.debug)
         options.setdefault('use_debugger', self.debug)
+        options.setdefault('threaded', True)
+
+        cli.show_server_banner(self.env, self.debug, self.name)
 
         from werkzeug.serving import run_simple
 
@@ -1055,7 +1085,8 @@ class Flask(_PackageBoundObject):
         return iter(self._blueprint_order)
 
     @setupmethod
-    def add_url_rule(self, rule, endpoint=None, view_func=None, provide_automatic_options=None, **options):
+    def add_url_rule(self, rule, endpoint=None, view_func=None,
+                     provide_automatic_options=None, **options):
         """Connects a URL rule.  Works exactly like the :meth:`route`
         decorator.  If a view_func is provided it will be registered with the
         endpoint.
@@ -2109,8 +2140,8 @@ class Flask(_PackageBoundObject):
         return RequestContext(self, environ)
 
     def test_request_context(self, *args, **kwargs):
-        """Creates a WSGI environment from the given values (see
-        :class:`werkzeug.test.EnvironBuilder` for more information, this
+        """Creates a :class:`~flask.ctx.RequestContext` from the given values
+        (see :class:`werkzeug.test.EnvironBuilder` for more information, this
         function accepts the same arguments plus two additional).
 
         Additional arguments (only if ``base_url`` is not specified):

@@ -5,7 +5,7 @@
 
     The basic functionality.
 
-    :copyright: (c) 2015 by Armin Ronacher.
+    :copyright: © 2010 by the Pallets team.
     :license: BSD, see LICENSE for more details.
 """
 
@@ -221,12 +221,21 @@ def test_endpoint_decorator(app, client):
 def test_session(app, client):
     @app.route('/set', methods=['POST'])
     def set():
+        assert not flask.session.accessed
+        assert not flask.session.modified
         flask.session['value'] = flask.request.form['value']
+        assert flask.session.accessed
+        assert flask.session.modified
         return 'value set'
 
     @app.route('/get')
     def get():
-        return flask.session['value']
+        assert not flask.session.accessed
+        assert not flask.session.modified
+        v = flask.session.get('value', 'None')
+        assert flask.session.accessed
+        assert not flask.session.modified
+        return v
 
     assert client.post('/set', data={'value': '42'}).data == b'value set'
     assert client.get('/get').data == b'42'
@@ -310,6 +319,7 @@ def test_session_using_session_settings(app, client):
         SESSION_COOKIE_DOMAIN='.example.com',
         SESSION_COOKIE_HTTPONLY=False,
         SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_SAMESITE='Lax',
         SESSION_COOKIE_PATH='/'
     )
 
@@ -324,6 +334,34 @@ def test_session_using_session_settings(app, client):
     assert 'path=/' in cookie
     assert 'secure' in cookie
     assert 'httponly' not in cookie
+    assert 'samesite' in cookie
+
+
+def test_session_using_samesite_attribute(app, client):
+    @app.route('/')
+    def index():
+        flask.session['testing'] = 42
+        return 'Hello World'
+
+    app.config.update(SESSION_COOKIE_SAMESITE='invalid')
+
+    with pytest.raises(ValueError):
+        client.get('/')
+
+    app.config.update(SESSION_COOKIE_SAMESITE=None)
+    rv = client.get('/')
+    cookie = rv.headers['set-cookie'].lower()
+    assert 'samesite' not in cookie
+
+    app.config.update(SESSION_COOKIE_SAMESITE='Strict')
+    rv = client.get('/')
+    cookie = rv.headers['set-cookie'].lower()
+    assert 'samesite=strict' in cookie
+
+    app.config.update(SESSION_COOKIE_SAMESITE='Lax')
+    rv = client.get('/')
+    cookie = rv.headers['set-cookie'].lower()
+    assert 'samesite=lax' in cookie
 
 
 def test_session_localhost_warning(recwarn, app, client):

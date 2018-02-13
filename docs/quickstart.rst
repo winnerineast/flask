@@ -130,19 +130,23 @@ That is not very nice and Flask can do better.  If you enable debug
 support the server will reload itself on code changes, and it will also
 provide you with a helpful debugger if things go wrong.
 
-To enable debug mode you can export the ``FLASK_DEBUG`` environment variable
+To enable all development features (including debug mode) you can export
+the ``FLASK_ENV`` environment variable and set it to ``development``
 before running the server::
 
-    $ export FLASK_DEBUG=1
+    $ export FLASK_ENV=development
     $ flask run
 
-(On Windows you need to use ``set`` instead of ``export``).
+(On Windows you need to use ``set`` instead of ``export``.)
 
 This does the following things:
 
 1.  it activates the debugger
 2.  it activates the automatic reloader
 3.  it enables the debug mode on the Flask application.
+
+You can also control debug mode separately from the environment by
+exporting ``FLASK_DEBUG=1``.
 
 There are more parameters that are explained in the :ref:`server` docs.
 
