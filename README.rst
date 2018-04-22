@@ -36,16 +36,18 @@ A Simple Example
     def hello():
         return 'Hello, World!'
 
-.. code-block:: none
+.. code-block:: text
 
     $ FLASK_APP=hello.py flask run
-     * Running on http://localhost:5000/
+     * Serving Flask app "hello"
+     * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
 
 
 Links
 -----
 
 * Website: https://www.palletsprojects.com/p/flask/
+* Documentation: http://flask.pocoo.org/docs/
 * Releases: https://pypi.org/project/Flask/
 * Code: https://github.com/pallets/flask
 * Issue tracker: https://github.com/pallets/flask/issues

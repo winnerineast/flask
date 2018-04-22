@@ -181,8 +181,8 @@ The following configuration values are used internally by Flask:
 .. py:data:: SESSION_COOKIE_DOMAIN
 
     The domain match rule that the session cookie will be valid for. If not
-    set, the cookie will be valid for all subdomains of ``SERVER_NAME``. If
-    ``False``, the cookie's domain will not be set.
+    set, the cookie will be valid for all subdomains of :data:`SERVER_NAME`.
+    If ``False``, the cookie's domain will not be set.
 
     Default: ``None``
 
@@ -257,13 +257,14 @@ The following configuration values are used internally by Flask:
 
 .. py:data:: SERVER_NAME
 
-    Inform the application what host and port it is bound to. Required for
-    subdomain route matching support.
+    Inform the application what host and port it is bound to. Required
+    for subdomain route matching support.
 
     If set, will be used for the session cookie domain if
-    ``SESSION_COOKIE_DOMAIN`` is not set. Modern web browsers will not allow
-    setting cookies for domains without a dot. To use a domain locally,
-    add any names that should route to the app to your ``hosts`` file. ::
+    :data:`SESSION_COOKIE_DOMAIN` is not set. Modern web browsers will
+    not allow setting cookies for domains without a dot. To use a domain
+    locally, add any names that should route to the app to your
+    ``hosts`` file. ::
 
         127.0.0.1 localhost.dev
 
@@ -342,6 +343,12 @@ The following configuration values are used internally by Flask:
 
     Default: ``False``
 
+.. py:data:: MAX_COOKIE_SIZE
+
+    Warn if cookie headers are larger than this many bytes. Defaults to
+    ``4093``. Larger cookies may be silently ignored by browsers. Set to
+    ``0`` to disable the warning.
+
 .. versionadded:: 0.4
    ``LOGGER_NAME``
 
@@ -379,6 +386,8 @@ The following configuration values are used internally by Flask:
 
     Added :data:`SESSION_COOKIE_SAMESITE` to control the session
     cookie's ``SameSite`` option.
+
+    Added :data:`MAX_COOKIE_SIZE` to control a warning from Werkzeug.
 
 
 Configuring from Files
